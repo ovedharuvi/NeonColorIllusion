@@ -1,6 +1,7 @@
 import numpy as np
 import imutils
 import scipy.ndimage as ndimage
+from scipy.signal import convolve2d
 
 
 def to_rad(deg):
@@ -15,7 +16,7 @@ def apply_img_filter(img, f, mode='correlate'):
     if mode == 'correlate':
         return ndimage.correlate(img, f, mode='nearest').transpose()
     elif mode == 'conv':
-        return ndimage.convolve(img, f, mode='nearest')
+        return convolve2d(img, f, mode='same')
 
 
 def fspecial_motion_blur(length, angle):
