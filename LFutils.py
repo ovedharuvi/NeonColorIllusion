@@ -51,7 +51,7 @@ def line_filling_sc(img, theta, fac, c=0.05):
     blurred_im = 2 * apply_img_filter(img_NR, motion_blur_ker)
     motion_blur_ker = fspecial_motion_blur(np.round(fac/2), 90-theta)
     k = max(fac/4, 1)
-    return k * (blurred_im + apply_img_filter(img_NR, motion_blur_ker))
+    return k * (blurred_im + apply_img_filter(img_NR, motion_blur_ker)), img_NR
 
 # bresenham function is the accepted answer of SO's post https://stackoverflow.com/questions/23930274/list-of-coordinates-between-irregular-points-in-python
 def bresenham(x0, y0, x1, y1):
