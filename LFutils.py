@@ -1,6 +1,8 @@
 import numpy as np
 import imutils
 import scipy.ndimage as ndimage
+from scipy.signal import convolve2d
+from cv2 import resize as resize
 import skimage
 
 def to_rad(deg):
@@ -42,6 +44,8 @@ def get_gabor_filter(theta, lmd=12, sig=8, x_b=13, y_b=13, length=25):
             l[j][i] = np.cos((2*np.pi / lmd) * k)
             l_norm[j][i] = l[j][i]
             l[j][i] *= exp
+    l_norm = resize(l_norm, (length // 5, length // 5))
+    l = resize(l, (length // 5, length // 5))
     return l, l_norm
 
 
