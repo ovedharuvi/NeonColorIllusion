@@ -2,6 +2,7 @@ import numpy as np
 import imutils
 import scipy.ndimage as ndimage
 from scipy.signal import convolve2d
+from cv2 import resize as resize
 
 
 def to_rad(deg):
@@ -42,6 +43,9 @@ def get_gabor_filter(theta, lmd=12, sig=8, x_b=13, y_b=13, length=25):
             l[j][i] = np.cos((2*np.pi / lmd) * k)
             l_norm[j][i] = l[j][i]
             l[j][i] *= exp
+
+    l_norm = resize(l_norm, (length//5, length//5))
+    l = resize(l, (length//5, length//5))
     return l, l_norm
 
 
@@ -52,7 +56,7 @@ def line_filling_sc(img, theta, fac, c=0.05):
     blurred_im = 2 * apply_img_filter(img_NR, motion_blur_ker)
     motion_blur_ker = fspecial_motion_blur(np.round(fac/2), 90-theta)
     k = max(fac/4, 1)
-    return k * (blurred_im + apply_img_filter(img_NR, motion_blur_ker)), img_NR
+    return k * (blurred_im + apply_img_filter(img_NR, motion_blur_ker)) , img_NR
 
 # bresenham function is the accepted answer of SO's post https://stackoverflow.com/questions/23930274/list-of-coordinates-between-irregular-points-in-python
 def bresenham(x0, y0, x1, y1):
