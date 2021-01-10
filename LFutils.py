@@ -33,24 +33,43 @@ def fspecial_motion_blur(length, angle):
     return f
 
 
-def get_gabor_filter(theta, lmd=12, sig=8, x_b=13, y_b=13, length=25):
-    """theta must be radiant (NOT degrees!)"""
-    xs = ys = [k for k in range(length)]
-    l = np.zeros((length, length))
+def get_gabor_filter(angle=0, length=25, sig=8, gamma=1, lmd=12, psi=0, is_radian=True):
+    # get half size
+    d = length // 2
+    
+    if (not is_radian):
+      # degree -> radian
+      theta = to_rad(angle)
+    else:
+      theta = angle
+
+    # prepare kernel
+    gabor = np.zeros((length, length), dtype=np.float32)
     l_norm = np.zeros((length, length))
-    for i in range(length):
-        for j in range(length):
-            exp = np.power(np.e, -((xs[i]-x_b) ^ 2 + (ys[j]-y_b) ^ 2)/(sig ^ 2))
-            k = (xs[i]-x_b) * np.cos(theta) + (ys[i]-y_b) * np.sin(theta)
-            l[j][i] = np.cos((2*np.pi / lmd) * k)
-            l_norm[j][i] = l[j][i]
-            l[j][i] *= exp
 
+    # each value
+    for y in range(length):
+        for x in range(length):
+            # distance from center
+            px = x - d
+            py = y - d
+
+            # get kernel x
+            _x = np.cos(theta) * px + np.sin(theta) * py
+
+            # get kernel y
+            _y = -np.sin(theta) * px + np.cos(theta) * py
+
+            # fill kernel
+            gabor[y, x] = np.exp(-(_x ** 2 + gamma ** 2 * _y ** 2) / (2 * sig ** 2)) * np.cos(2 * np.pi * _x / lmd + psi)
+            l_norm[y][x] = np.cos((2 * np.pi / lmd) * _x)
+
+    # kernel normalization
+    gabor /= np.sum(np.abs(gabor))
+    gabor = resize(gabor, (np.sqrt(length) // 1, np.sqrt(length) // 1))
     l_norm = resize(l_norm, (length // 5, length // 5))
-    l = resize(l, (length // 5, length // 5))
 
-    return l, l_norm
-
+    return gabor, l_norm
 
 def line_filling_sc(img, theta, fac, c=0.05):
     """theta must be degrees (NOT radiant!)"""
