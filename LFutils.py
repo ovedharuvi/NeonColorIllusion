@@ -46,8 +46,9 @@ def get_gabor_filter(theta, lmd=12, sig=8, x_b=13, y_b=13, length=25):
             l_norm[j][i] = l[j][i]
             l[j][i] *= exp
 
-    l_norm = resize(l_norm, (length//5, length//5))
-    l = resize(l, (length//5, length//5))
+    l_norm = resize(l_norm, (length // 5, length // 5))
+    l = resize(l, (length // 5, length // 5))
+
     return l, l_norm
 
 
