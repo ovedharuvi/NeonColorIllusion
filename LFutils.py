@@ -5,6 +5,7 @@ from scipy.signal import convolve2d
 from cv2 import resize as resize
 import skimage
 
+
 def to_rad(deg):
     return (deg * np.pi) / 180
 
@@ -32,9 +33,15 @@ def fspecial_motion_blur(length, angle):
     return f
 
 
-def get_gabor_filter(angle=0, length=25, sig=8, gamma=1, lmd=12, psi=0):
+def get_gabor_filter(angle=0, length=25, sig=8, gamma=1, lmd=12, psi=0, is_radian=True):
     # get half size
     d = length // 2
+    
+    if (not is_radian):
+      # degree -> radian
+      theta = to_rad(angle)
+    else:
+      theta = angle
 
     # prepare kernel
     gabor = np.zeros((length, length), dtype=np.float32)
@@ -46,9 +53,6 @@ def get_gabor_filter(angle=0, length=25, sig=8, gamma=1, lmd=12, psi=0):
             # distance from center
             px = x - d
             py = y - d
-
-            # degree -> radian
-            theta = angle / 180. * np.pi
 
             # get kernel x
             _x = np.cos(theta) * px + np.sin(theta) * py
