@@ -3,6 +3,7 @@ import imutils
 import scipy.ndimage as ndimage
 from scipy.signal import convolve2d
 from cv2 import resize as resize
+import skimage
 
 
 def to_rad(deg):
@@ -17,13 +18,14 @@ def apply_img_filter(img, f, mode='correlate'):
     if mode == 'correlate':
         return ndimage.correlate(img, f, mode='nearest').transpose()
     elif mode == 'conv':
-        return convolve2d(img, f, mode='same')
+        return ndimage.convolve(img, f, mode='nearest')
 
 
 def fspecial_motion_blur(length, angle):
     # First generate a horizontal line across the middle
-    f = np.zeros(length)
-    f[np.floor(length / 2) + 1, 1:length] = 1
+    shape = (length, length)
+    f = np.zeros(shape)
+    f[length // 2 + 1, 1:length] = 1
 
     # Then rotate to specified angle
     f = imutils.rotate_bound(f, angle)
@@ -38,7 +40,7 @@ def get_gabor_filter(theta, lmd=12, sig=8, x_b=13, y_b=13, length=25):
     l_norm = np.zeros((length, length))
     for i in range(length):
         for j in range(length):
-            exp = np.exp(np.e, -((xs[i]-x_b) ^ 2 + (ys[j]-y_b) ^ 2)/(sig ^ 2))
+            exp = np.power(np.e, -((xs[i]-x_b) ^ 2 + (ys[j]-y_b) ^ 2)/(sig ^ 2))
             k = (xs[i]-x_b) * np.cos(theta) + (ys[i]-y_b) * np.sin(theta)
             l[j][i] = np.cos((2*np.pi / lmd) * k)
             l_norm[j][i] = l[j][i]
@@ -51,12 +53,12 @@ def get_gabor_filter(theta, lmd=12, sig=8, x_b=13, y_b=13, length=25):
 
 def line_filling_sc(img, theta, fac, c=0.05):
     """theta must be degrees (NOT radiant!)"""
-    img_NR = np.power(img, 2) / (np.power(img, 2) + c ^ 2)
-    motion_blur_ker = fspecial_motion_blur(fac, 90-theta)
+    img_NR = np.power(img, 2) / (np.power(img, 2) + c ** 2)
+    motion_blur_ker = fspecial_motion_blur(int(fac), 90-theta)
     blurred_im = 2 * apply_img_filter(img_NR, motion_blur_ker)
-    motion_blur_ker = fspecial_motion_blur(np.round(fac/2), 90-theta)
+    motion_blur_ker = fspecial_motion_blur(int(np.round(fac/2)), 90-theta)
     k = max(fac/4, 1)
-    return k * (blurred_im + apply_img_filter(img_NR, motion_blur_ker)) , img_NR
+    return k * (blurred_im + apply_img_filter(img_NR, motion_blur_ker)).T , img_NR
 
 # bresenham function is the accepted answer of SO's post https://stackoverflow.com/questions/23930274/list-of-coordinates-between-irregular-points-in-python
 def bresenham(x0, y0, x1, y1):
@@ -107,4 +109,14 @@ def strel_line(length, degrees):
             idx.append(np.ravel_multi_index((int(x[0]), int(x[1])), (n_rows, n_columns)))
         strel.reshape(-1)[idx] = 1
 
-    return strel
+    return skimage.img_as_ubyte(strel).T
+
+def strech(img):
+    img_cpy = np.copy(img)
+    max_val = np.max(img_cpy)
+    min_val = np.maximum([[-1 for i in range(img.shape[1])] for j in range(img.shape[0])], np.min(img_cpy))
+
+    img_cpy = np.maximum(img, min_val)
+    img_cpy = img_cpy - min_val
+    img_cpy = img_cpy / max_val
+    return img_cpy
