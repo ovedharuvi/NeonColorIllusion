@@ -18,7 +18,7 @@ def preprocess(input_image):
 
 
 def line_filling(input_image):
-    LDR = 1
+    LDR = 0
     img = preprocess(input_image)
     scale_levels = 4
     im_scel = np.zeros(img.shape)
