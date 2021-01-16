@@ -4,6 +4,7 @@ import scipy.ndimage as ndimage
 from scipy.signal import convolve2d
 from cv2 import resize as resize
 import skimage
+import matplotlib.pyplot as plt
 
 
 def to_rad(deg):
@@ -66,7 +67,7 @@ def get_gabor_filter(angle=0, length=25, sig=8, gamma=1, lmd=12, psi=0, is_radia
 
     # kernel normalization
     gabor /= np.sum(np.abs(gabor))
-    gabor = resize(gabor, (np.sqrt(length) // 1, np.sqrt(length) // 1))
+    gabor = resize(gabor, (int(np.sqrt(length)) , int(np.sqrt(length))))
     l_norm = resize(l_norm, (length // 5, length // 5))
 
     return gabor, l_norm
@@ -110,6 +111,13 @@ def bresenham(x0, y0, x1, y1):
 
     return points
 
+def detect_edges(img, theta):
+    L, L_norm = get_gabor_filter(to_rad(theta))
+    conv_norm = L_norm[int(np.ceil(L.shape[0] / 2)), int(np.ceil(L.shape[0] / 2))]
+    img_o = apply_img_filter(img, L, mode='conv')/conv_norm
+    img_p = np.maximum(img_o, np.zeros(img_o.shape))
+    img_n = np.maximum(-img_o, np.zeros(img_o.shape))
+    return img_p, img_n
 
 def strel_line(length, degrees):
     if length >= 1:
