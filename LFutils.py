@@ -1,10 +1,9 @@
-import numpy as np
+import cv2
 import imutils
+import numpy as np
 import scipy.ndimage as ndimage
-from scipy.signal import convolve2d
-from cv2 import resize as resize
 import skimage
-import matplotlib.pyplot as plt
+from cv2 import resize as resize
 
 
 def to_rad(deg):
@@ -34,15 +33,15 @@ def fspecial_motion_blur(length, angle):
     return f
 
 
-def get_gabor_filter(angle=0, length=25, sig=8, gamma=1, lmd=12, psi=0, is_radian=True):
+def get_gabor_filter(angle=0, length=81, sig=20, gamma=1, lmd=5, psi=0, is_radian=True):
     # get half size
     d = length // 2
-    
+
     if (not is_radian):
-      # degree -> radian
-      theta = to_rad(angle)
+        # degree -> radian
+        theta = to_rad(angle)
     else:
-      theta = angle
+        theta = angle
 
     # prepare kernel
     gabor = np.zeros((length, length), dtype=np.float32)
@@ -62,24 +61,27 @@ def get_gabor_filter(angle=0, length=25, sig=8, gamma=1, lmd=12, psi=0, is_radia
             _y = -np.sin(theta) * px + np.cos(theta) * py
 
             # fill kernel
-            gabor[y, x] = np.exp(-(_x ** 2 + gamma ** 2 * _y ** 2) / (2 * sig ** 2)) * np.cos(2 * np.pi * _x / lmd + psi)
+            gabor[y, x] = np.exp(-(_x ** 2 + gamma ** 2 * _y ** 2) / (2 * sig ** 2)) * np.cos(
+                2 * np.pi * _x / lmd + psi)
             l_norm[y][x] = np.cos((2 * np.pi / lmd) * _x)
 
     # kernel normalization
     gabor /= np.sum(np.abs(gabor))
-    gabor = resize(gabor, (int(np.sqrt(length)) , int(np.sqrt(length))))
-    l_norm = resize(l_norm, (length // 5, length // 5))
+    gabor = resize(gabor, (int(np.sqrt(length)), int(np.sqrt(length))))
+    l_norm = resize(l_norm, (length // 9, length // 9))
 
     return gabor, l_norm
+
 
 def line_filling_sc(img, theta, fac, c=0.05):
     """theta must be degrees (NOT radiant!)"""
     img_NR = np.power(img, 2) / (np.power(img, 2) + c ** 2)
-    motion_blur_ker = fspecial_motion_blur(int(fac), 90-theta)
+    motion_blur_ker = fspecial_motion_blur(int(fac), 90 - theta)
     blurred_im = 2 * apply_img_filter(img_NR, motion_blur_ker)
-    motion_blur_ker = fspecial_motion_blur(int(np.round(fac/2)), 90-theta)
-    k = max(fac/4, 1)
-    return k * (blurred_im + apply_img_filter(img_NR, motion_blur_ker)).T , img_NR
+    motion_blur_ker = fspecial_motion_blur(int(np.round(fac / 2)), 90 - theta)
+    k = max(fac / 4, 1)
+    return k * (blurred_im + apply_img_filter(img_NR, motion_blur_ker)).T, img_NR
+
 
 # bresenham function is the accepted answer of SO's post https://stackoverflow.com/questions/23930274/list-of-coordinates-between-irregular-points-in-python
 def bresenham(x0, y0, x1, y1):
@@ -111,13 +113,41 @@ def bresenham(x0, y0, x1, y1):
 
     return points
 
+
 def detect_edges(img, theta):
     L, L_norm = get_gabor_filter(to_rad(theta))
     conv_norm = L_norm[int(np.ceil(L.shape[0] / 2)), int(np.ceil(L.shape[0] / 2))]
-    img_o = apply_img_filter(img, L, mode='conv')/conv_norm
+    img_o = apply_img_filter(img, L, mode='conv') / conv_norm
     img_p = np.maximum(img_o, np.zeros(img_o.shape))
+    img_p = normalize(img_p)
+    img_p = skimage.img_as_ubyte(normalize(img_p))
+    ret, img_p = cv2.threshold(img_p, 127, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    kernel = np.ones((3, 3), np.uint8)
+    dilated_img = cv2.dilate(img_p, kernel, iterations=3)
+    contours, hier = cv2.findContours(dilated_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    real_contours = []
+    pixels_for_guesses = []
+    for c in contours:
+        if cv2.contourArea(c) > dilated_img.shape[0] * dilated_img.shape[1] / 200:
+            real_contours.append(c)
+            topmost = tuple(c[c[:, :, 1].argmin()][0])
+            bottommost = tuple(c[c[:, :, 1].argmax()][0])
+            pixels_for_guesses.append(topmost)
+            pixels_for_guesses.append(bottommost)
+    new_img = np.zeros(dilated_img.shape)
+    for px in pixels_for_guesses:
+        new_img[px[1], px[0]] = 1
+
+    new_img = skimage.img_as_ubyte(new_img)
+    new_img += trigger_ort_guess(new_img , theta)
+    new_img += trigger_linear_guess(new_img, theta)
+    # cv2.drawContours(new_img , real_contours , -1 , (255,255,0) , 1)
+    print(len(real_contours))
+    cv2.imshow("contours", new_img)
+
     img_n = np.maximum(-img_o, np.zeros(img_o.shape))
     return img_p, img_n
+
 
 def strel_line(length, degrees):
     if length >= 1:
@@ -139,6 +169,7 @@ def strel_line(length, degrees):
 
     return skimage.img_as_ubyte(strel).T
 
+
 def strech(img):
     img_cpy = np.copy(img)
     max_val = np.max(img_cpy)
@@ -148,3 +179,33 @@ def strech(img):
     img_cpy = img_cpy - min_val
     img_cpy = img_cpy / max_val
     return img_cpy
+
+
+def normalize(img):
+    return (img - np.min(img)) / (np.max(img) - np.min(img))
+
+def trigger_linear_guess(img_edges , theta):
+    structured_element = strel_line(10, theta)
+    img_dilated = cv2.dilate(img_edges , kernel=structured_element)
+
+def trigger_ort_guess(img_edges, thata):
+    return
+
+def makeGaussian(size, fwhm = 3, center=None):
+    """ Make a square gaussian kernel.
+
+    size is the length of a side of the square
+    fwhm is full-width-half-maximum, which
+    can be thought of as an effective radius.
+    """
+
+    x = np.arange(0, size, 1, float)
+    y = x[:,np.newaxis]
+
+    if center is None:
+        x0 = y0 = size // 2
+    else:
+        x0 = center[0]
+        y0 = center[1]
+
+    return np.exp(-4*np.log(2) * ((x-x0)**2 + (y-y0)**2) / fwhm**2)

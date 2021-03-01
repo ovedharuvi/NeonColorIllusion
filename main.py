@@ -16,7 +16,7 @@ plt.imshow(img, cmap='gray')
 plt.xticks([]), plt.yticks([])  # to hide tick values on X & Y axis
 plt.show()
 
-filled_img = line_filling(img)
+filled_img = detect_false_contour(img)
 plt.imshow(filled_img, cmap='gray')
 plt.xticks([]), plt.yticks([])  # to hide tick values on X & Y axis
 plt.show()
