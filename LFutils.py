@@ -1,9 +1,12 @@
 import cv2
 import imutils
 import numpy as np
+import scipy
 import scipy.ndimage as ndimage
 import skimage
+import matplotlib.pylab as plt
 from cv2 import resize as resize
+from scipy.stats import norm
 
 
 def to_rad(deg):
@@ -114,10 +117,11 @@ def bresenham(x0, y0, x1, y1):
     return points
 
 
-def detect_edges(img, theta):
-    L, L_norm = get_gabor_filter(to_rad(theta))
+def trigger_guess_by_orientation(img, theta):
+    L, L_norm = get_gabor_filter(to_rad(0))
+    img_rotated = rotate_img(img, theta)
     conv_norm = L_norm[int(np.ceil(L.shape[0] / 2)), int(np.ceil(L.shape[0] / 2))]
-    img_o = apply_img_filter(img, L, mode='conv') / conv_norm
+    img_o = apply_img_filter(img_rotated, L, mode='conv') / conv_norm
     img_p = np.maximum(img_o, np.zeros(img_o.shape))
     img_p = normalize(img_p)
     img_p = skimage.img_as_ubyte(normalize(img_p))
@@ -134,19 +138,24 @@ def detect_edges(img, theta):
             bottommost = tuple(c[c[:, :, 1].argmax()][0])
             pixels_for_guesses.append(topmost)
             pixels_for_guesses.append(bottommost)
-    new_img = np.zeros(dilated_img.shape)
+    img_orientation_guess = np.zeros(dilated_img.shape)
     for px in pixels_for_guesses:
-        new_img[px[1], px[0]] = 1
+        # FIXME - implement "get_var_for_gaussian" (pixel, original_img) --> int
+        # var = get_var_for_gaussian(pixel, original_img)
+        var = 1  # FIXME
+        img_orientation_guess = trigger_ort_guess(img_orientation_guess, var, px)
+        img_orientation_guess = trigger_linear_guess(img_orientation_guess, var, px)
 
-    new_img = skimage.img_as_ubyte(new_img)
-    new_img += trigger_ort_guess(new_img , theta)
-    new_img += trigger_linear_guess(new_img, theta)
+    img_orientation_guess = skimage.img_as_ubyte(img_orientation_guess)
+
+
+
     # cv2.drawContours(new_img , real_contours , -1 , (255,255,0) , 1)
     print(len(real_contours))
-    cv2.imshow("contours", new_img)
-
+    cv2.imshow("contours", img_orientation_guess)
+    img_orientation_guess = rotate_img(img_orientation_guess, -theta)
     img_n = np.maximum(-img_o, np.zeros(img_o.shape))
-    return img_p, img_n
+    return img_orientation_guess
 
 
 def strel_line(length, degrees):
@@ -184,12 +193,36 @@ def strech(img):
 def normalize(img):
     return (img - np.min(img)) / (np.max(img) - np.min(img))
 
-def trigger_linear_guess(img_edges , theta):
-    structured_element = strel_line(10, theta)
-    img_dilated = cv2.dilate(img_edges , kernel=structured_element)
+def trigger_linear_guess(img_gauss_guess, var, px):
+    GAUSS_SIZE = 101
+    x = np.linspace(norm.ppf(0.01),
+                    norm.ppf(0.99), GAUSS_SIZE)
+    gauss_line = norm.pdf(x, loc=0, scale=var)
+    l, c = px[0], px[1]
+    j = 0
+    for i in range(-GAUSS_SIZE // 2, GAUSS_SIZE // 2):
+        if l+i >= img_gauss_guess.shape[0]:
+            break
+        img_gauss_guess[l+i][c] = gauss_line[j]
+        j += 1
+    return img_gauss_guess
 
-def trigger_ort_guess(img_edges, thata):
-    return
+
+def trigger_ort_guess(img_gauss_guess, var, px):
+    GAUSS_SIZE = 101
+    x = np.linspace(norm.ppf(0.01),
+                    norm.ppf(0.99), GAUSS_SIZE)
+    gauss_line = norm.pdf(x, loc=0, scale=var)
+    l, c = px[0], px[1]
+    j = 0
+    for i in range(-GAUSS_SIZE//2, GAUSS_SIZE//2):
+        if c+i >= img_gauss_guess.shape[1]:
+            break
+        img_gauss_guess[l][c + i] = gauss_line[j]
+        j += 1
+    return img_gauss_guess
+
+
 
 def makeGaussian(size, fwhm = 3, center=None):
     """ Make a square gaussian kernel.
@@ -209,3 +242,10 @@ def makeGaussian(size, fwhm = 3, center=None):
         y0 = center[1]
 
     return np.exp(-4*np.log(2) * ((x-x0)**2 + (y-y0)**2) / fwhm**2)
+
+
+def rotate_img(img, theta):
+    image_center = tuple(np.array(img.shape[1::-1]) / 2)
+    rot_mat = cv2.getRotationMatrix2D(image_center, theta, 1.0)
+    result = cv2.warpAffine(img, rot_mat, img.shape[1::-1], flags=cv2.INTER_LINEAR)
+    return result

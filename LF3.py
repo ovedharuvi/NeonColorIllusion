@@ -25,7 +25,9 @@ def detect_false_contour(input_image):
     kk = len(thetas)
     tic = time.perf_counter()
     for theta in thetas:
-        edges_p, edges_n = detect_edges(img, theta)
+        guesses_sum += trigger_guess_by_orientation(img, theta)
+
+    x=1
     return guesses_sum
 
 
