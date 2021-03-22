@@ -8,6 +8,8 @@ import matplotlib.pylab as plt
 from cv2 import resize as resize
 from scipy.stats import norm
 
+from parameters import *
+
 
 def to_rad(deg):
     return (deg * np.pi) / 180
@@ -70,8 +72,8 @@ def get_gabor_filter(angle=0, length=81, sig=20, gamma=1, lmd=5, psi=0, is_radia
 
     # kernel normalization
     gabor /= np.sum(np.abs(gabor))
-    gabor = resize(gabor, (int(np.sqrt(length)), int(np.sqrt(length))))
-    l_norm = resize(l_norm, (length // 9, length // 9))
+    gabor = resize(gabor, GABOR_KERNEL_SIZE)
+    l_norm = resize(l_norm, (length // 5, length // 5))
 
     return gabor, l_norm
 
@@ -117,22 +119,43 @@ def bresenham(x0, y0, x1, y1):
     return points
 
 
-def trigger_guess_by_orientation(img, theta):
+def get_params_for_gaussian(pixel, original_img):
+    BOX_SIZE = 5
+
+    px_l, px_c = pixel[1], pixel[0]
+    upper_px = original_img.shape[0] - 1 if px_l + BOX_SIZE >= original_img.shape[0] else px_l + BOX_SIZE
+    lower_px = 0 if px_l - BOX_SIZE < 0 else px_l - BOX_SIZE
+    left_px = 0 if px_c - BOX_SIZE < 0 else px_c - BOX_SIZE
+    right_px = original_img.shape[1] - 1 if px_c + BOX_SIZE >= original_img.shape[1] else px_c + BOX_SIZE
+
+    # original_img_hsv = cv2.cvtColor(original_img, cv2.COLOR_RGB2HSV)
+    px_box = original_img[lower_px:upper_px, left_px:right_px]
+    if px_box.shape[0] == 0 or px_box.shape[1] == 0:
+        return 0.001, 0.001
+    grad_mag = np.amax(px_box) - np.amin(px_box)
+    grad_score = 255 - grad_mag
+    var = 1.5*np.e ** (-1 * grad_score)
+    lambda_ret = var  # FIXME
+    return lambda_ret, var
+
+
+def trigger_guess_by_orientation(img, input_image, theta):
     L, L_norm = get_gabor_filter(to_rad(0))
     img_rotated = rotate_img(img, theta)
+    input_image_rotated = rotate_img(input_image, theta)
     conv_norm = L_norm[int(np.ceil(L.shape[0] / 2)), int(np.ceil(L.shape[0] / 2))]
     img_o = apply_img_filter(img_rotated, L, mode='conv') / conv_norm
     img_p = np.maximum(img_o, np.zeros(img_o.shape))
     img_p = normalize(img_p)
     img_p = skimage.img_as_ubyte(normalize(img_p))
-    ret, img_p = cv2.threshold(img_p, 127, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    kernel = np.ones((3, 3), np.uint8)
-    dilated_img = cv2.dilate(img_p, kernel, iterations=3)
+    ret, img_p = cv2.threshold(img_p, POST_GABOR_THRESHOLD, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    kernel = np.ones(DILATION_KERNEL_SIZE, np.uint8)
+    dilated_img = cv2.dilate(img_p, kernel, iterations=DILATION_ITERATIONS)
     contours, hier = cv2.findContours(dilated_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     real_contours = []
     pixels_for_guesses = []
     for c in contours:
-        if cv2.contourArea(c) > dilated_img.shape[0] * dilated_img.shape[1] / 200:
+        if cv2.contourArea(c) > dilated_img.shape[0] * dilated_img.shape[1] / CONTOUR_AREA_THRESH:
             real_contours.append(c)
             topmost = tuple(c[c[:, :, 1].argmin()][0])
             bottommost = tuple(c[c[:, :, 1].argmax()][0])
@@ -140,19 +163,17 @@ def trigger_guess_by_orientation(img, theta):
             pixels_for_guesses.append(bottommost)
     img_orientation_guess = np.zeros(dilated_img.shape)
     for px in pixels_for_guesses:
-        # FIXME - implement "get_var_for_gaussian" (pixel, original_img) --> int
-        # var = get_var_for_gaussian(pixel, original_img)
-        var = 1  # FIXME
-        img_orientation_guess = trigger_ort_guess(img_orientation_guess, var, px)
+        lamda, var = get_params_for_gaussian(px, dilated_img)
         img_orientation_guess = trigger_linear_guess(img_orientation_guess, var, px)
+        img_orientation_guess = trigger_ort_guess(img_orientation_guess, var, px)
 
-    img_orientation_guess = skimage.img_as_ubyte(img_orientation_guess)
+    img_orientation_guess = skimage.img_as_ubyte(normalize(img_orientation_guess))
 
 
 
     # cv2.drawContours(new_img , real_contours , -1 , (255,255,0) , 1)
     print(len(real_contours))
-    cv2.imshow("contours", img_orientation_guess)
+    # cv2.imshow("contours", img_orientation_guess)
     img_orientation_guess = rotate_img(img_orientation_guess, -theta)
     img_n = np.maximum(-img_o, np.zeros(img_o.shape))
     return img_orientation_guess
@@ -198,7 +219,7 @@ def trigger_linear_guess(img_gauss_guess, var, px):
     x = np.linspace(norm.ppf(0.01),
                     norm.ppf(0.99), GAUSS_SIZE)
     gauss_line = norm.pdf(x, loc=0, scale=var)
-    l, c = px[0], px[1]
+    l, c = px[1], px[0]
     j = 0
     for i in range(-GAUSS_SIZE // 2, GAUSS_SIZE // 2):
         if l+i >= img_gauss_guess.shape[0]:
@@ -213,7 +234,7 @@ def trigger_ort_guess(img_gauss_guess, var, px):
     x = np.linspace(norm.ppf(0.01),
                     norm.ppf(0.99), GAUSS_SIZE)
     gauss_line = norm.pdf(x, loc=0, scale=var)
-    l, c = px[0], px[1]
+    l, c = px[1], px[0]
     j = 0
     for i in range(-GAUSS_SIZE//2, GAUSS_SIZE//2):
         if c+i >= img_gauss_guess.shape[1]:
