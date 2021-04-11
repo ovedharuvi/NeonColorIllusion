@@ -2,8 +2,7 @@
 
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-import skimage
-
+from ImageUtils import *
 from FalseContours import detect_false_contour
 from Params import *
 import matplotlib.pylab as plt
@@ -14,15 +13,22 @@ orig = img
 # img = img[:, :, :-1]
 print('Image shape:{}, Image data type:{}'.format(img.shape, img.dtype))
 plt.imshow(img, cmap='gray')
+plt.title("Original Image")
 plt.xticks([]), plt.yticks([])  # to hide tick values on X & Y axis
 plt.show()
 
 guesses_sum, threshold_guesses_sum = detect_false_contour(img)
-
+guesses_sum = normalize(guesses_sum)
 plt.imshow(threshold_guesses_sum, cmap='gray')
+plt.title("Guesses with threshold")
+plt.xticks([]), plt.yticks([])  # to hide tick values on X & Y axis
+plt.show()
+plt.imshow(guesses_sum, cmap='gray')
+plt.title("Guesses without threshold")
 plt.xticks([]), plt.yticks([])  # to hide tick values on X & Y axis
 plt.show()
 
-img = color.rgb2gray(img)
-plt.imshow(skimage.img_as_ubyte(img) - threshold_guesses_sum, cmap='gray')
+threshold_guesses_sum = skimage.color.gray2rgb(threshold_guesses_sum)
+plt.title("Final Result")
+plt.imshow(skimage.img_as_ubyte(img) - skimage.img_as_ubyte(threshold_guesses_sum), cmap='gray')
 plt.show()

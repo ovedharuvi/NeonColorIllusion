@@ -1,20 +1,17 @@
-import numpy as np
 from scipy.stats import norm
-
 from ImageUtils import *
 from Params import *
 import cv2
 from cv2 import resize
 
+
 def detect_false_contour(input_image):
-    LDR = 0
     img = preprocess(input_image)
-    img = color.rgb2gray(input_image)
     guesses_sum = np.zeros(img.shape)
     thetas = np.arange(0, 360, THETAS_STEP)
     kk = len(thetas)
     for theta in thetas:
-        guesses_sum += trigger_guess_by_orientation(img, input_image, theta)
+        guesses_sum += trigger_guess_by_orientation(img, input_image, theta)//kk
     nor_filled_img = skimage.img_as_ubyte(normalize(guesses_sum))
     ret, threshold_guesses_sum = cv2.threshold(nor_filled_img, GUESSES_THRESHOLD, 255, cv2.THRESH_TOZERO)
     return guesses_sum, threshold_guesses_sum
@@ -24,7 +21,7 @@ def get_gabor_filter(angle=0, length=81, sig=20, gamma=1, lmd=5, psi=0, is_radia
     # get half size
     d = length // 2
 
-    if (not is_radian):
+    if not is_radian:
         # degree -> radian
         theta = to_rad(angle)
     else:
@@ -70,10 +67,8 @@ def line_filling_sc(img, theta, fac, c=0.05):
     return k * (blurred_im + apply_img_filter(img_NR, motion_blur_ker)).T, img_NR
 
 
-
-"""bresenham function is the accepted answer of SO's post
- https://stackoverflow.com/questions/23930274/list-of-coordinates-between-irregular-points-in-python
-"""
+# bresenham function is the accepted answer of SO's post
+#  https://stackoverflow.com/questions/23930274/list-of-coordinates-between-irregular-points-in-python
 def bresenham(x0, y0, x1, y1):
     points = []
     dx = abs(x1 - x0)
@@ -104,10 +99,8 @@ def bresenham(x0, y0, x1, y1):
     return points
 
 
-
 def get_params_for_gaussian(pixel, original_img):
-    BOX_SIZE = 5
-
+    BOX_SIZE = GAUSSIAN_PARAMS_BOX_SIZE
     px_l, px_c = pixel[1], pixel[0]
     upper_px = original_img.shape[0] - 1 if px_l + BOX_SIZE >= original_img.shape[0] else px_l + BOX_SIZE
     lower_px = 0 if px_l - BOX_SIZE < 0 else px_l - BOX_SIZE
@@ -128,7 +121,7 @@ def get_params_for_gaussian(pixel, original_img):
 def trigger_guess_by_orientation(img, input_image, theta):
     L, L_norm = get_gabor_filter(to_rad(0))
     img_rotated = rotate_img(img, theta)
-    input_image_rotated = rotate_img(input_image, theta)
+    # input_image_rotated = rotate_img(input_image, theta)
     conv_norm = L_norm[int(np.ceil(L.shape[0] / 2)), int(np.ceil(L.shape[0] / 2))]
     img_o = apply_img_filter(img_rotated, L, mode='conv') / conv_norm
     img_p = np.maximum(img_o, np.zeros(img_o.shape))
@@ -159,9 +152,8 @@ def trigger_guess_by_orientation(img, input_image, theta):
     print(len(real_contours))
     # cv2.imshow("contours", img_orientation_guess)
     img_orientation_guess = rotate_img(img_orientation_guess, -theta)
-    img_n = np.maximum(-img_o, np.zeros(img_o.shape))
+    # img_n = np.maximum(-img_o, np.zeros(img_o.shape))
     return img_orientation_guess
-
 
 
 def strel_line(length, degrees):
@@ -185,7 +177,6 @@ def strel_line(length, degrees):
 
 
 def trigger_linear_guess(img_gauss_guess, var, px):
-    GAUSS_SIZE = 101
     x = np.linspace(norm.ppf(0.01),
                     norm.ppf(0.99), GAUSS_SIZE)
     gauss_line = norm.pdf(x, loc=0, scale=var)
@@ -200,7 +191,6 @@ def trigger_linear_guess(img_gauss_guess, var, px):
 
 
 def trigger_ort_guess(img_gauss_guess, var, px):
-    GAUSS_SIZE = 101
     x = np.linspace(norm.ppf(0.01),
                     norm.ppf(0.99), GAUSS_SIZE)
     gauss_line = norm.pdf(x, loc=0, scale=var)
@@ -212,7 +202,3 @@ def trigger_ort_guess(img_gauss_guess, var, px):
         img_gauss_guess[l][c + i] = gauss_line[j]
         j += 1
     return img_gauss_guess
-
-
-
-

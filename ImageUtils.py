@@ -1,7 +1,7 @@
-import imutils
-import skimage
-import numpy as np
 import cv2
+import imutils
+import numpy as np
+import skimage
 from scipy import ndimage
 from skimage import color
 
@@ -9,6 +9,13 @@ from skimage import color
 def preprocess(input_image):
     img = skimage.img_as_float(input_image)
     img_dim = img.shape[2]
+
+    if img_dim == 4:
+        img = color.rgba2rgb(img)
+        img_dim = 3
+    if img_dim == 3:
+        img_hsv = color.rgb2hsv(img)
+        return img_hsv[:, :, 2]
     if img_dim > 1:
         img_hsv = color.rgb2hsv(img)
         # img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
@@ -31,6 +38,7 @@ def apply_img_filter(img, f, mode='correlate'):
     elif mode == 'conv':
         return ndimage.convolve(img, f, mode='nearest')
 
+
 def fspecial_motion_blur(length, angle):
     # First generate a horizontal line across the middle
     shape = (length, length)
@@ -41,6 +49,7 @@ def fspecial_motion_blur(length, angle):
     f = imutils.rotate_bound(f, angle)
     f = f / sum(f[:])
     return f
+
 
 def strech(img):
     img_cpy = np.copy(img)
@@ -64,7 +73,7 @@ def rotate_img(img, theta):
     return result
 
 
-def makeGaussian(size, fwhm = 3, center=None):
+def makeGaussian(size, fwhm=3, center=None):
     """ Make a square gaussian kernel.
 
     size is the length of a side of the square
@@ -73,7 +82,7 @@ def makeGaussian(size, fwhm = 3, center=None):
     """
 
     x = np.arange(0, size, 1, float)
-    y = x[:,np.newaxis]
+    y = x[:, np.newaxis]
 
     if center is None:
         x0 = y0 = size // 2
@@ -81,4 +90,4 @@ def makeGaussian(size, fwhm = 3, center=None):
         x0 = center[0]
         y0 = center[1]
 
-    return np.exp(-4*np.log(2) * ((x-x0)**2 + (y-y0)**2) / fwhm**2)
+    return np.exp(-4 * np.log(2) * ((x - x0) ** 2 + (y - y0) ** 2) / fwhm ** 2)
