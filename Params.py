@@ -1,4 +1,7 @@
+# Main params
+image_path = 'grayNeon.png'
 
+# False Contour Params
 CONTOUR_AREA_THRESH = 500
 DILATION_ITERATIONS = 3
 DILATION_KERNEL_SIZE = (5, 5)

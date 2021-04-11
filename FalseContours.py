@@ -1,41 +1,23 @@
-import cv2
-import imutils
 import numpy as np
-import scipy
-import scipy.ndimage as ndimage
-import skimage
-import matplotlib.pylab as plt
-from cv2 import resize as resize
 from scipy.stats import norm
 
-from parameters import *
+from ImageUtils import *
+from Params import *
+import cv2
+from cv2 import resize
 
-
-def to_rad(deg):
-    return (deg * np.pi) / 180
-
-
-def to_degrees(rad):
-    return (rad / np.pi) * 180
-
-
-def apply_img_filter(img, f, mode='correlate'):
-    if mode == 'correlate':
-        return ndimage.correlate(img, f, mode='nearest').transpose()
-    elif mode == 'conv':
-        return ndimage.convolve(img, f, mode='nearest')
-
-
-def fspecial_motion_blur(length, angle):
-    # First generate a horizontal line across the middle
-    shape = (length, length)
-    f = np.zeros(shape)
-    f[length // 2 + 1, 1:length] = 1
-
-    # Then rotate to specified angle
-    f = imutils.rotate_bound(f, angle)
-    f = f / sum(f[:])
-    return f
+def detect_false_contour(input_image):
+    LDR = 0
+    img = preprocess(input_image)
+    img = color.rgb2gray(input_image)
+    guesses_sum = np.zeros(img.shape)
+    thetas = np.arange(0, 360, THETAS_STEP)
+    kk = len(thetas)
+    for theta in thetas:
+        guesses_sum += trigger_guess_by_orientation(img, input_image, theta)
+    nor_filled_img = skimage.img_as_ubyte(normalize(guesses_sum))
+    ret, threshold_guesses_sum = cv2.threshold(nor_filled_img, GUESSES_THRESHOLD, 255, cv2.THRESH_TOZERO)
+    return guesses_sum, threshold_guesses_sum
 
 
 def get_gabor_filter(angle=0, length=81, sig=20, gamma=1, lmd=5, psi=0, is_radian=True):
@@ -88,7 +70,10 @@ def line_filling_sc(img, theta, fac, c=0.05):
     return k * (blurred_im + apply_img_filter(img_NR, motion_blur_ker)).T, img_NR
 
 
-# bresenham function is the accepted answer of SO's post https://stackoverflow.com/questions/23930274/list-of-coordinates-between-irregular-points-in-python
+
+"""bresenham function is the accepted answer of SO's post
+ https://stackoverflow.com/questions/23930274/list-of-coordinates-between-irregular-points-in-python
+"""
 def bresenham(x0, y0, x1, y1):
     points = []
     dx = abs(x1 - x0)
@@ -117,6 +102,7 @@ def bresenham(x0, y0, x1, y1):
     points.append((x, y))
 
     return points
+
 
 
 def get_params_for_gaussian(pixel, original_img):
@@ -169,8 +155,6 @@ def trigger_guess_by_orientation(img, input_image, theta):
 
     img_orientation_guess = skimage.img_as_ubyte(normalize(img_orientation_guess))
 
-
-
     # cv2.drawContours(new_img , real_contours , -1 , (255,255,0) , 1)
     print(len(real_contours))
     # cv2.imshow("contours", img_orientation_guess)
@@ -179,40 +163,26 @@ def trigger_guess_by_orientation(img, input_image, theta):
     return img_orientation_guess
 
 
+
 def strel_line(length, degrees):
-    if length >= 1:
-        theta = degrees * np.pi / 180
-        x = round((length - 1) / 2 * np.cos(theta))
-        y = -round((length - 1) / 2 * np.sin(theta))
-        points = bresenham(-x, -y, x, y)
-        points_x = [point[0] for point in points]
-        points_y = [point[1] for point in points]
-        n_rows = int(2 * max([abs(point_y) for point_y in points_y]) + 1)
-        n_columns = int(2 * max([abs(point_x) for point_x in points_x]) + 1)
-        strel = np.zeros((n_rows, n_columns))
-        rows = ([point_y + max([abs(point_y) for point_y in points_y]) for point_y in points_y])
-        columns = ([point_x + max([abs(point_x) for point_x in points_x]) for point_x in points_x])
-        idx = []
-        for x in zip(rows, columns):
-            idx.append(np.ravel_multi_index((int(x[0]), int(x[1])), (n_rows, n_columns)))
-        strel.reshape(-1)[idx] = 1
+    theta = degrees * np.pi / 180
+    x = round((length - 1) / 2 * np.cos(theta))
+    y = -round((length - 1) / 2 * np.sin(theta))
+    points = bresenham(-x, -y, x, y)
+    points_x = [point[0] for point in points]
+    points_y = [point[1] for point in points]
+    n_rows = int(2 * max([abs(point_y) for point_y in points_y]) + 1)
+    n_columns = int(2 * max([abs(point_x) for point_x in points_x]) + 1)
+    strel = np.zeros((n_rows, n_columns))
+    rows = ([point_y + max([abs(point_y) for point_y in points_y]) for point_y in points_y])
+    columns = ([point_x + max([abs(point_x) for point_x in points_x]) for point_x in points_x])
+    idx = []
+    for x in zip(rows, columns):
+        idx.append(np.ravel_multi_index((int(x[0]), int(x[1])), (n_rows, n_columns)))
+    strel.reshape(-1)[idx] = 1
 
     return skimage.img_as_ubyte(strel).T
 
-
-def strech(img):
-    img_cpy = np.copy(img)
-    max_val = np.max(img_cpy)
-    min_val = np.maximum([[-1 for i in range(img.shape[1])] for j in range(img.shape[0])], np.min(img_cpy))
-
-    img_cpy = np.maximum(img, min_val)
-    img_cpy = img_cpy - min_val
-    img_cpy = img_cpy / max_val
-    return img_cpy
-
-
-def normalize(img):
-    return (img - np.min(img)) / (np.max(img) - np.min(img))
 
 def trigger_linear_guess(img_gauss_guess, var, px):
     GAUSS_SIZE = 101
@@ -245,28 +215,4 @@ def trigger_ort_guess(img_gauss_guess, var, px):
 
 
 
-def makeGaussian(size, fwhm = 3, center=None):
-    """ Make a square gaussian kernel.
 
-    size is the length of a side of the square
-    fwhm is full-width-half-maximum, which
-    can be thought of as an effective radius.
-    """
-
-    x = np.arange(0, size, 1, float)
-    y = x[:,np.newaxis]
-
-    if center is None:
-        x0 = y0 = size // 2
-    else:
-        x0 = center[0]
-        y0 = center[1]
-
-    return np.exp(-4*np.log(2) * ((x-x0)**2 + (y-y0)**2) / fwhm**2)
-
-
-def rotate_img(img, theta):
-    image_center = tuple(np.array(img.shape[1::-1]) / 2)
-    rot_mat = cv2.getRotationMatrix2D(image_center, theta, 1.0)
-    result = cv2.warpAffine(img, rot_mat, img.shape[1::-1], flags=cv2.INTER_LINEAR)
-    return result
