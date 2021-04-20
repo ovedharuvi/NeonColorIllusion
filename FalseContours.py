@@ -1,17 +1,18 @@
+import matplotlib.pyplot as plt
+from cv2 import resize
 from scipy.stats import norm
+import logging
 from ImageUtils import *
 from Params import *
-import cv2
-from cv2 import resize
 
 
-def detect_false_contour(input_image):
-    img = preprocess(input_image)
+def detect_false_contour(img, original_img):
+    logging.info("Starting detect false contours")
     guesses_sum = np.zeros(img.shape)
     thetas = np.arange(0, 360, THETAS_STEP)
     kk = len(thetas)
     for theta in thetas:
-        guesses_sum += trigger_guess_by_orientation(img, input_image, theta)//kk
+        guesses_sum += trigger_guess_by_orientation(img, original_img, theta) // kk
     nor_filled_img = skimage.img_as_ubyte(normalize(guesses_sum))
     ret, threshold_guesses_sum = cv2.threshold(nor_filled_img, GUESSES_THRESHOLD, 255, cv2.THRESH_TOZERO)
     return guesses_sum, threshold_guesses_sum
@@ -113,15 +114,15 @@ def get_params_for_gaussian(pixel, original_img):
         return 0.001, 0.001
     grad_mag = np.amax(px_box) - np.amin(px_box)
     grad_score = 255 - grad_mag
-    var = 1.5*np.e ** (-1 * grad_score)
+    var = 1.5 * np.e ** (-1 * grad_score)
     lambda_ret = var  # FIXME
     return lambda_ret, var
 
 
-def trigger_guess_by_orientation(img, input_image, theta):
-    L, L_norm = get_gabor_filter(to_rad(0))
+def trigger_guess_by_orientation(img, orig_image, theta):
+    logging.info('Started trigger guess for theta = {}'.format(theta))
+    L, L_norm = get_gabor_filter(0)
     img_rotated = rotate_img(img, theta)
-    # input_image_rotated = rotate_img(input_image, theta)
     conv_norm = L_norm[int(np.ceil(L.shape[0] / 2)), int(np.ceil(L.shape[0] / 2))]
     img_o = apply_img_filter(img_rotated, L, mode='conv') / conv_norm
     img_p = np.maximum(img_o, np.zeros(img_o.shape))
@@ -131,28 +132,25 @@ def trigger_guess_by_orientation(img, input_image, theta):
     kernel = np.ones(DILATION_KERNEL_SIZE, np.uint8)
     dilated_img = cv2.dilate(img_p, kernel, iterations=DILATION_ITERATIONS)
     contours, hier = cv2.findContours(dilated_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    logging.info('For theta = {} , Number of contours found = {}'.format(theta, len(contours)))
     real_contours = []
     pixels_for_guesses = []
     for c in contours:
-        if cv2.contourArea(c) > dilated_img.shape[0] * dilated_img.shape[1] / CONTOUR_AREA_THRESH:
+        if cv2.contourArea(c) > np.sqrt(orig_image.shape[0] * orig_image.shape[1]):
             real_contours.append(c)
             topmost = tuple(c[c[:, :, 1].argmin()][0])
             bottommost = tuple(c[c[:, :, 1].argmax()][0])
             pixels_for_guesses.append(topmost)
             pixels_for_guesses.append(bottommost)
     img_orientation_guess = np.zeros(dilated_img.shape)
+    if len(contours) == 0:
+        return img_orientation_guess
     for px in pixels_for_guesses:
         lamda, var = get_params_for_gaussian(px, dilated_img)
         img_orientation_guess = trigger_linear_guess(img_orientation_guess, var, px)
         img_orientation_guess = trigger_ort_guess(img_orientation_guess, var, px)
-
-    img_orientation_guess = skimage.img_as_ubyte(normalize(img_orientation_guess))
-
-    # cv2.drawContours(new_img , real_contours , -1 , (255,255,0) , 1)
-    print(len(real_contours))
-    # cv2.imshow("contours", img_orientation_guess)
     img_orientation_guess = rotate_img(img_orientation_guess, -theta)
-    # img_n = np.maximum(-img_o, np.zeros(img_o.shape))
+    img_orientation_guess = skimage.img_as_ubyte(normalize(img_orientation_guess))
     return img_orientation_guess
 
 
@@ -183,9 +181,9 @@ def trigger_linear_guess(img_gauss_guess, var, px):
     l, c = px[1], px[0]
     j = 0
     for i in range(-GAUSS_SIZE // 2, GAUSS_SIZE // 2):
-        if l+i >= img_gauss_guess.shape[0]:
+        if l + i >= img_gauss_guess.shape[0]:
             break
-        img_gauss_guess[l+i][c] = gauss_line[j]
+        img_gauss_guess[l + i][c] = gauss_line[j]
         j += 1
     return img_gauss_guess
 
@@ -196,9 +194,14 @@ def trigger_ort_guess(img_gauss_guess, var, px):
     gauss_line = norm.pdf(x, loc=0, scale=var)
     l, c = px[1], px[0]
     j = 0
-    for i in range(-GAUSS_SIZE//2, GAUSS_SIZE//2):
-        if c+i >= img_gauss_guess.shape[1]:
+    for i in range(-GAUSS_SIZE // 2, GAUSS_SIZE // 2):
+        if c + i >= img_gauss_guess.shape[1]:
             break
         img_gauss_guess[l][c + i] = gauss_line[j]
         j += 1
     return img_gauss_guess
+
+
+def show(img):
+    plt.imshow(img, cmap='gray')
+    plt.show()
