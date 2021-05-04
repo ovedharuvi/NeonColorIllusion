@@ -43,15 +43,21 @@ def draw_contours(img, contours):
 
 
 def find_contour_hue(img):
-    yiq_img = color.rgb2yiq(img)
-    colourfullness = lambda px: px[1] ** 2 + px[2] ** 2
-    colorfulness_img = [colourfullness(px) for px in yiq_img]
-    max_color_index = np.unravel_index(np.argmax(colorfulness_img), yiq_img.shape)
-    # for i in range(img.shape[0]):
-    #     for j in range(img.shape[1]):
-    #         colorfulness_img[i][j] = yiq_img[i][j][1] ** 2 + yiq_img[i][j][2] ** 2
-    colored_pixel = np.argmax(colorfulness_img)
-    return img[colored_pixel[0]][colored_pixel[1]]
+    # yiq_img = color.rgb2yiq(img)
+    # colorfulness_img = yiq_img[:, :, 2]**2 + yiq_img[:, :, 0]**2
+    # pix_argmax = np.argmax(colorfulness_img)
+    # max_color_index = np.unravel_index(pix_argmax, colorfulness_img.shape)
+    # hue = img[max_color_index[0]][max_color_index[1]]
+
+    (R, G, B) = cv2.split(img.astype("float"))
+    rg = np.absolute(R - G)
+    yb = np.absolute(0.5 * (R + G) - B)
+    colorfulness_img = rg**2 + yb**2
+    pix_argmax = np.argmax(colorfulness_img)
+    max_color_index = np.unravel_index(pix_argmax, colorfulness_img.shape)
+    hue = img[max_color_index[1]][max_color_index[0]]
+    return hue
+
 
 
 def bounding_box(cnt):
