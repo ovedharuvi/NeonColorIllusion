@@ -1,8 +1,8 @@
 # Main params
-image_path = 'Images/SaturationTest.jpg'
+image_path = 'Images/grayNeon.png'
 
 # False Contour Params
-CONTOUR_AREA_THRESH = 200
+CONTOUR_AREA_THRESH = 400
 DILATION_ITERATIONS = 3
 DILATION_KERNEL_SIZE = (5, 5)
 GABOR_KERNEL_SIZE = (5, 5)
@@ -11,7 +11,8 @@ GUESSES_THRESHOLD = 30
 GAUSSIAN_PARAMS_BOX_SIZE = 5
 POST_GABOR_THRESHOLD = 127
 THETAS_STEP = 10
-PAD_SIZE = 1000
+PAD_SIZE = 300
+IS_GRAY = True
 
 # Diffusion Params
 

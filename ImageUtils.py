@@ -26,14 +26,16 @@ def preprocess(input_image):
     return padded_img
 
 
-def draw_contours(img, contours):
-    if len(img.shape) == 2 or img.shape[2] == 1:
+def draw_contours(img, contours, is_gray):
+    if is_gray:
+        img = skimage.color.rgb2gray(img)
+    if is_gray or len(img.shape) == 2 or img.shape[2] == 1:
         return img - contours
     contours = skimage.img_as_ubyte(normalize(contours))
     contours, hier = cv2.findContours(contours, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     real_contours = []
     for c in contours:
-        if cv2.contourArea(c) > np.sqrt(img.shape[0] * img.shape[1]):
+        if cv2.contourArea(c) > 2*np.sqrt(img.shape[0] * img.shape[1]):
             x, y, w, h = cv2.boundingRect(c)
             cropped_area = img[y:y + h, x:x + w, :]
             hue = find_contour_hue(cropped_area)

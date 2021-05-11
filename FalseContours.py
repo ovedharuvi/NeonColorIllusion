@@ -128,9 +128,9 @@ def trigger_guess_by_orientation(img, orig_image, theta):
     img_p = np.maximum(img_o, np.zeros(img_o.shape))
     img_p = normalize(img_p)
     img_p = skimage.img_as_ubyte(normalize(img_p))
-    ret, img_p = cv2.threshold(img_p, POST_GABOR_THRESHOLD, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     kernel = np.ones(DILATION_KERNEL_SIZE, np.uint8)
     dilated_img = cv2.dilate(img_p, kernel, iterations=DILATION_ITERATIONS)
+    ret, dilated_img = cv2.threshold(dilated_img, POST_GABOR_THRESHOLD, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     contours, hier = cv2.findContours(dilated_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     logging.info('For theta = {} , Number of contours found = {}'.format(theta, len(contours)))
     real_contours = []
