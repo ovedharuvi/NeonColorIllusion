@@ -29,7 +29,6 @@ def preprocess(input_image):
 def draw_contours(img, contours):
     if len(img.shape) == 2 or img.shape[2] == 1:
         return img - contours
-    result = 1
     contours = skimage.img_as_ubyte(normalize(contours))
     contours, hier = cv2.findContours(contours, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     real_contours = []
@@ -39,7 +38,13 @@ def draw_contours(img, contours):
             cropped_area = img[y:y + h, x:x + w, :]
             hue = find_contour_hue(cropped_area)
             real_contours.append((c, hue))
+    result = img
+    for cnt, hue in real_contours:
+        result = cv2.drawContours(image=result, contours=[cnt], contourIdx=-1,
+                                  color=(int(hue[0]), int(hue[1]), int(hue[2])),
+                                  thickness=1, lineType=cv2.LINE_AA)
     return result
+
 
 
 def find_contour_hue(img):

@@ -14,30 +14,34 @@ img = io.imread(image_path)
 img = init_img(img)
 orig = img
 logging.info('Image shape:{}, Image data type:{}'.format(img.shape, img.dtype))
-plt.imshow(img, cmap='gray')
+plt.figure(figsize=(30,15))
+plt.subplot(131)
+plt.imshow(img , cmap='gray')
 plt.title("Original Image")
-plt.xticks([]), plt.yticks([])  # to hide tick values on X & Y axis
-plt.show()
+plt.xticks([]), plt.yticks([])
 
 img = preprocess(img)
 guesses_sum, threshold_guesses_sum = detect_false_contour(img, orig)
 guesses_sum = post_process(guesses_sum)
 threshold_guesses_sum = post_process(threshold_guesses_sum)
 
+plt.subplot(132)
 plt.imshow(threshold_guesses_sum, cmap='gray')
 plt.title("Guesses with threshold")
 plt.xticks([]), plt.yticks([])  # to hide tick values on X & Y axis
-plt.show()
-plt.imshow(guesses_sum, cmap='gray')
-plt.title("Guesses without threshold")
-plt.xticks([]), plt.yticks([])  # to hide tick values on X & Y axis
-plt.show()
+#
+# plt.imshow(guesses_sum, cmap='gray')
+# plt.title("Guesses without threshold")
+# plt.xticks([]), plt.yticks([])  # to hide tick values on X & Y axis
+# plt.show()
 
 # if orig.shape[2] >= 3:
 #     threshold_guesses_sum = skimage.img_as_ubyte(skimage.color.gray2rgb(threshold_guesses_sum))
 orig_final = skimage.img_as_ubyte(orig)
 final = draw_contours(orig_final, threshold_guesses_sum)
 
-plt.title("Final Result")
+plt.subplot(133)
+plt.title("False Contour Algorithm Result")
 plt.imshow(final, cmap='gray')
+plt.xticks([]), plt.yticks([])
 plt.show()
