@@ -35,18 +35,24 @@ def draw_contours(img, contours, is_gray):
     contours, hier = cv2.findContours(contours, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     real_contours = []
     for c in contours:
-        if cv2.contourArea(c) > 2*np.sqrt(img.shape[0] * img.shape[1]):
+        if cv2.contourArea(c) > 2 * np.sqrt(img.shape[0] * img.shape[1]):
             x, y, w, h = cv2.boundingRect(c)
             cropped_area = img[y:y + h, x:x + w, :]
             hue = find_contour_hue(cropped_area)
             real_contours.append((c, hue))
     result = img
+    white = skimage.img_as_ubyte(np.ones(img.shape))
     for cnt, hue in real_contours:
-        result = cv2.drawContours(image=result, contours=[cnt], contourIdx=-1,
-                                  color=(int(hue[0]), int(hue[1]), int(hue[2])),
-                                  thickness=1, lineType=cv2.LINE_AA)
-    return result
+        hue = (int(hue[0]), int(hue[1]), int(hue[2]))
+        cv2.drawContours(image=white, contours=[cnt], contourIdx=-1,
+                         color=hue,
+                         thickness=2, lineType=cv2.LINE_AA)
 
+        # hue = colorsys.rgb_to_hls(hue[0], hue[1], hue[2])
+        # hue = (hue[0], 250, hue[2])
+        # hue = colorsys.hls_to_rgb(hue[0], hue[1], hue[2])
+        # cv2.fillConvexPoly(white, cnt, color=(int(hue[0]), int(hue[1]), int(hue[2])))
+    return white, real_contours
 
 
 def find_contour_hue(img):
@@ -59,12 +65,11 @@ def find_contour_hue(img):
     (R, G, B) = cv2.split(img.astype("float"))
     rg = np.absolute(R - G)
     yb = np.absolute(0.5 * (R + G) - B)
-    colorfulness_img = rg**2 + yb**2
+    colorfulness_img = rg ** 2 + yb ** 2
     pix_argmax = np.argmax(colorfulness_img)
     max_color_index = np.unravel_index(pix_argmax, colorfulness_img.shape)
     hue = img[max_color_index[1]][max_color_index[0]]
     return hue
-
 
 
 def bounding_box(cnt):

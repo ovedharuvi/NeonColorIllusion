@@ -1,7 +1,10 @@
+import logging
+
 import matplotlib.pyplot as plt
+import skimage.io
 from cv2 import resize
 from scipy.stats import norm
-import logging
+
 from ImageUtils import *
 from Params import *
 
@@ -122,12 +125,19 @@ def get_params_for_gaussian(pixel, original_img):
 def trigger_guess_by_orientation(img, orig_image, theta):
     logging.info('Started trigger guess for theta = {}'.format(theta))
     L, L_norm = get_gabor_filter(0)
+    if SAVE :
+        filename= f'Results/gabor_filter_orientation_0.jpg'
+        skimage.io.imsave(filename, L)
     img_rotated = rotate_img(img, theta)
     conv_norm = L_norm[int(np.ceil(L.shape[0] / 2)), int(np.ceil(L.shape[0] / 2))]
     img_o = apply_img_filter(img_rotated, L, mode='conv') / conv_norm
     img_p = np.maximum(img_o, np.zeros(img_o.shape))
     img_p = normalize(img_p)
     img_p = skimage.img_as_ubyte(normalize(img_p))
+    if SAVE:
+        if theta == 0:
+            filename = f'Results/OrientationDetection_theta_{theta}.jpg'
+            skimage.io.imsave(filename, img_p)
     kernel = np.ones(DILATION_KERNEL_SIZE, np.uint8)
     dilated_img = cv2.dilate(img_p, kernel, iterations=DILATION_ITERATIONS)
     ret, dilated_img = cv2.threshold(dilated_img, POST_GABOR_THRESHOLD, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
@@ -151,6 +161,9 @@ def trigger_guess_by_orientation(img, orig_image, theta):
         img_orientation_guess = trigger_ort_guess(img_orientation_guess, var, px)
     img_orientation_guess = rotate_img(img_orientation_guess, -theta)
     img_orientation_guess = skimage.img_as_ubyte(normalize(img_orientation_guess))
+    if SAVE:
+        filename = f'Results/orientation_educated_guess_theta_{theta}.jpg'
+        skimage.io.imsave(filename, img_orientation_guess)
     return img_orientation_guess
 
 
