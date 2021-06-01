@@ -13,7 +13,7 @@ def get_central_point(hull_points):
 
 
 def get_line(point, central_point):
-    # being start and end two points (x1,y1), (x2,y2)
+    # being start and end two point (x1,y1), (x2,y2)
     discrete_line = np.array(list(zip(*line(*(point[0][1], point[0][0]), *(central_point[0][1], central_point[0][0])))))
 
     return discrete_line
