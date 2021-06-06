@@ -27,15 +27,15 @@ def preprocess(input_image):
 
 
 def draw_contours(img, contours, is_gray):
-    if is_gray:
-        img = skimage.color.rgb2gray(img)
-    if is_gray or len(img.shape) == 2 or img.shape[2] == 1:
-        return img - contours
+    # if is_gray:
+    #     img = skimage.color.rgb2gray(img)
     contours = skimage.img_as_ubyte(normalize(contours))
-    contours, hier = cv2.findContours(contours, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    kernel = np.ones((2,2), np.uint8)
+    dilated_img = cv2.dilate(contours, kernel, iterations=DILATION_ITERATIONS)
+    contours, hier = cv2.findContours(dilated_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     real_contours = []
     for c in contours:
-        if cv2.contourArea(c) > 2 * np.sqrt(img.shape[0] * img.shape[1]):
+        if cv2.contourArea(c) > 100:
             x, y, w, h = cv2.boundingRect(c)
             cropped_area = img[y:y + h, x:x + w, :]
             hue = find_contour_hue(cropped_area)
@@ -46,12 +46,7 @@ def draw_contours(img, contours, is_gray):
         hue = (int(hue[0]), int(hue[1]), int(hue[2]))
         cv2.drawContours(image=white, contours=[cnt], contourIdx=-1,
                          color=hue,
-                         thickness=2, lineType=cv2.LINE_AA)
-
-        # hue = colorsys.rgb_to_hls(hue[0], hue[1], hue[2])
-        # hue = (hue[0], 250, hue[2])
-        # hue = colorsys.hls_to_rgb(hue[0], hue[1], hue[2])
-        # cv2.fillConvexPoly(white, cnt, color=(int(hue[0]), int(hue[1]), int(hue[2])))
+                         thickness=DRAW_THICKNESS, lineType=cv2.LINE_AA)
     return white, real_contours
 
 
@@ -68,7 +63,7 @@ def find_contour_hue(img):
     colorfulness_img = rg ** 2 + yb ** 2
     pix_argmax = np.argmax(colorfulness_img)
     max_color_index = np.unravel_index(pix_argmax, colorfulness_img.shape)
-    hue = img[max_color_index[1]][max_color_index[0]]
+    hue = img[max_color_index[0]][max_color_index[1]]
     return hue
 
 

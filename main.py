@@ -46,12 +46,18 @@ if SAVE:
 #     threshold_guesses_sum = skimage.img_as_ubyte(skimage.color.gray2rgb(threshold_guesses_sum))
 orig_final = skimage.img_as_ubyte(orig)
 line_completion, contours = draw_contours(orig_final, threshold_guesses_sum, IS_GRAY)
-
-diffusion = diffusion(orig_final, contours)
-
 if SAVE:
     filename = 'Results/finalLineCompletion.jpg'
     skimage.io.imsave(filename, line_completion)
+
+diffusion = diffusion(orig_final, contours)
+dst = cv2.addWeighted(orig_final, 0.5, diffusion, 0.5, 0)
+
+if SAVE:
+    filename = 'Results/diffusionOnly.jpg'
+    skimage.io.imsave(filename, diffusion)
+    filename = 'Results/finalDiffusion.jpg'
+    skimage.io.imsave(filename, dst)
 
 # plt.subplot(133)
 # plt.title("Line filling algorithm result")
