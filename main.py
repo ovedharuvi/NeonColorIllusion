@@ -1,15 +1,12 @@
-# This is a sample Python script.
-
 import logging
-
 from skimage import io
-
 from Diffusion import diffusion
 from FalseContours import detect_false_contour
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 from ImageUtils import *
 from Params import *
+
+"""This is the main function which will run first when executing the program.
+In order change the parameters of the model- go to ./Params.py"""
 
 logging.basicConfig(level=logging.INFO)
 img = io.imread(image_path)
@@ -51,7 +48,7 @@ if SAVE:
     skimage.io.imsave(filename, line_completion)
 
 diffusion = diffusion(orig_final, contours)
-dst = cv2.addWeighted(orig_final, 0.5, diffusion, 0.5, 0)
+dst = cv2.addWeighted(orig_final, 1-DIFFUSION_OVERLAY, diffusion, DIFFUSION_OVERLAY, 0)
 
 if SAVE:
     filename = 'Results/diffusionOnly.jpg'

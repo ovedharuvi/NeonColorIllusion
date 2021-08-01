@@ -26,16 +26,27 @@ def preprocess(input_image):
     return padded_img
 
 
+"""
+After filter out the weak guesses we would like to give our guesses the right color
+Algorithm Explained: 
+1. For each contour
+    a. get bounding box.
+    b. find dominant color in bounding box. (algorithm explained in 'find_contour_hue')
+    c. draw the contour with the dominant color
+"""
+
+
 def draw_contours(img, contours, is_gray):
     # if is_gray:
     #     img = skimage.color.rgb2gray(img)
     contours = skimage.img_as_ubyte(normalize(contours))
-    kernel = np.ones((2,2), np.uint8)
+    kernel = np.ones((2, 2), np.uint8)
     dilated_img = cv2.dilate(contours, kernel, iterations=DILATION_ITERATIONS)
     contours, hier = cv2.findContours(dilated_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     real_contours = []
     for c in contours:
-        if cv2.contourArea(c) > 100:
+        # if cv2.contourArea(c) > 100:
+        if cv2.contourArea(c) > img.shape[0]:
             x, y, w, h = cv2.boundingRect(c)
             cropped_area = img[y:y + h, x:x + w, :]
             hue = find_contour_hue(cropped_area)
@@ -50,13 +61,10 @@ def draw_contours(img, contours, is_gray):
     return white, real_contours
 
 
+"""
+Use Opponent color space and method to find dominant color as used by Hadar Cohen Duwek.
+"""
 def find_contour_hue(img):
-    # yiq_img = color.rgb2yiq(img)
-    # colorfulness_img = yiq_img[:, :, 2]**2 + yiq_img[:, :, 0]**2
-    # pix_argmax = np.argmax(colorfulness_img)
-    # max_color_index = np.unravel_index(pix_argmax, colorfulness_img.shape)
-    # hue = img[max_color_index[0]][max_color_index[1]]
-
     (R, G, B) = cv2.split(img.astype("float"))
     rg = np.absolute(R - G)
     yb = np.absolute(0.5 * (R + G) - B)

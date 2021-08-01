@@ -8,7 +8,10 @@ from scipy.stats import norm
 from ImageUtils import *
 from Params import *
 
-
+"""Algorithm Explained:
+1. For each theta aggregate the guesses by the current theta using gabor filter
+2. Filter out weak guesses using threshold.
+"""
 def detect_false_contour(img, original_img):
     logging.info("Starting detect false contours")
     guesses_sum = np.zeros(img.shape)
@@ -122,6 +125,17 @@ def get_params_for_gaussian(pixel, original_img):
     return lambda_ret, var
 
 
+"""
+Algorithm Explained:
+1. Rotate the image by theta.
+2. Find gradients with Gabor filter.
+3. Dilation in order to have continuous lines
+4. Filter out "small" lines (by area - reduce noise )
+5.  Find the bottom and up most points of the contours.
+6. Trigger gaussian guesses (linear and orthogonal) at the found points.
+7. Rotate image back to the original orientation.
+
+"""
 def trigger_guess_by_orientation(img, orig_image, theta):
     logging.info('Started trigger guess for theta = {}'.format(theta))
     L, L_norm = get_gabor_filter(0)
